@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'dart:ui'; // For ImageFilter
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'floating_background.dart';
+import 'package:http/http.dart' as http;
 
 // Simple global auth state for demo purposes
 final ValueNotifier<bool> isLoggedIn = ValueNotifier<bool>(false);
@@ -10,26 +12,78 @@ final ValueNotifier<bool> isLoggedIn = ValueNotifier<bool>(false);
 // Add these ValueNotifiers after isLoggedIn at the top:
 enum AppLanguage { en, ro }
 enum AppDesign { def, adv }
+enum ThemeOption { yellowWhite, blueWhite, yellowBlue }
+
 final ValueNotifier<bool> darkMode = ValueNotifier<bool>(false);
 final ValueNotifier<AppLanguage> selectedLanguage = ValueNotifier<AppLanguage>(AppLanguage.en);
 final ValueNotifier<AppDesign> selectedDesign = ValueNotifier<AppDesign>(AppDesign.def);
+final ValueNotifier<ThemeOption> selectedThemeOption = ValueNotifier<ThemeOption>(ThemeOption.yellowBlue);
+final ValueNotifier<bool> gradientDirection = ValueNotifier<bool>(true); // true = top-down, false = bottom-up
 
 // --- School Theme Constants ---
 class SchoolColors {
-  static const Color primaryBlue = Color(0xFF002B5C); // Deep Blue
-  static const Color accentGold = Color(0xFFD4AF37); // Gold
-  static const Color lightBackground = Color(0xFFF5F5F5); // Light Gray
-  static const Color darkBackground = Color(0xFF121212); // Dark Gray
+  // Base colors
+  static const Color _blue = Color(0xFF002B5C);
+  static const Color _gold = Color(0xFFD4AF37);
+  static const Color _white = Colors.white;
+  static const Color _black = Color(0xFF121212);
   
-  static const List<Color> primaryGradient = [
-    Color(0xFF002B5C),
-    Color(0xFF004080),
-  ];
-  
-  static const List<Color> darkGradient = [
-    Color(0xFF001A38),
-    Color(0xFF002B5C),
-  ];
+  // Dark mode variants
+  static const Color _darkBlue = Color(0xFF001A38);
+  static const Color _darkGold = Color(0xFFB8962E);
+
+  static const Color primaryBlue = _blue;
+  static const Color accentGold = _gold;
+  static const Color lightBackground = Color(0xFFF5F5F5);
+  static const Color darkBackground = _black;
+  static const List<Color> primaryGradient = [_blue, _gold];
+
+  static Color getThemeColor(ThemeOption option, bool isDark) {
+    switch (option) {
+      case ThemeOption.yellowWhite:
+        return isDark ? _black : _white; // Background/Main
+      case ThemeOption.blueWhite:
+        return isDark ? _black : _white;
+      case ThemeOption.yellowBlue:
+        return isDark ? _darkBlue : _blue;
+    }
+  }
+
+  static Color getAccentColor(ThemeOption option, bool isDark) {
+    switch (option) {
+      case ThemeOption.yellowWhite:
+        return isDark ? _darkBlue : _blue; // Accents
+      case ThemeOption.blueWhite:
+        return isDark ? _darkGold : _gold;
+      case ThemeOption.yellowBlue:
+        return isDark ? Colors.white70 : _white;
+    }
+  }
+
+  static List<Color> getGradient(ThemeOption option, bool isDark, bool direction) {
+    List<Color> colors;
+    switch (option) {
+      case ThemeOption.yellowWhite:
+        // Yellow with White (or Dark variants)
+        colors = isDark 
+            ? [_darkGold, _black] 
+            : [_gold, _white];
+        break;
+      case ThemeOption.blueWhite:
+        // Blue with White
+        colors = isDark 
+            ? [_darkBlue, _black] 
+            : [_blue, _white];
+        break;
+      case ThemeOption.yellowBlue:
+        // Blue top, Yellow bottom (Default)
+        colors = isDark 
+            ? [_darkBlue, _darkGold] 
+            : [_blue, _gold];
+        break;
+    }
+    return direction ? colors : colors.reversed.toList();
+  }
 }
 // ------------------------------
 
@@ -279,9 +333,11 @@ class SchoolGradientBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: darkMode,
-      builder: (context, isDark, _) {
+    return ValueListenableBuilder3<bool, ThemeOption, bool>(
+      first: darkMode,
+      second: selectedThemeOption,
+      third: gradientDirection,
+      builder: (context, isDark, themeOption, direction, _) {
         return Container(
           height: MediaQuery.of(context).size.height * heightFraction,
           width: double.infinity,
@@ -289,7 +345,7 @@ class SchoolGradientBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: isDark ? SchoolColors.darkGradient : SchoolColors.primaryGradient,
+              colors: SchoolColors.getGradient(themeOption, isDark, direction),
             ),
             borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(32),
@@ -454,7 +510,15 @@ class _HomePageState extends State<HomePage> {
                 flex: 55,
                 child: SchoolGradientBackground(
                   heightFraction: 1.0, // Fills this expanded part
-                  child: Container(), // Content is overlayed
+                  child: ValueListenableBuilder<AppDesign>(
+                    valueListenable: selectedDesign,
+                    builder: (context, design, _) {
+                      if (design == AppDesign.adv) {
+                        return const FloatingBackgroundLetters();
+                      }
+                      return Container();
+                    },
+                  ),
                 ),
               ),
               Expanded(
@@ -550,11 +614,27 @@ class _HomePageState extends State<HomePage> {
                                           shape: BoxShape.circle,
                                           border: Border.all(color: Colors.white.withOpacity(0.2), width: 2),
                                         ),
-                                        child: Icon(
-                                          Icons.school, // Changed to school icon
-                                          size: 80,
-                                          color: SchoolColors.accentGold,
-                                        ),
+                                        child: design == AppDesign.adv
+                                            ? ClipOval(
+                                                child: Image.network(
+                                                  'https://cnvga.ro/wp-content/uploads/2023/11/colegiu-vasile-goldis-arad-logo-512.png',
+                                                  height: 80,
+                                                  width: 80,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (context, error, stackTrace) {
+                                                    return Icon(
+                                                      Icons.school,
+                                                      size: 80,
+                                                      color: SchoolColors.accentGold,
+                                                    );
+                                                  },
+                                                ),
+                                              )
+                                            : Icon(
+                                                Icons.school,
+                                                size: 80,
+                                                color: SchoolColors.accentGold,
+                                              ),
                                       ),
                                     ),
                                   ],
@@ -737,58 +817,146 @@ class AppMenuDrawer extends StatelessWidget {
                           Navigator.pushNamed(context, "/help");
                         }),
                         const Divider(height: 32, thickness: 1),
+                        
                         ValueListenableBuilder<bool>(
                           valueListenable: darkMode,
                           builder: (context, dark, _) {
-                            return buildMenuItem(
-                              dark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                              t('theme'),
-                              () => darkMode.value = !darkMode.value,
-                              trailing: Switch(
-                                value: dark,
-                                activeColor: SchoolColors.accentGold,
-                                onChanged: (v) => darkMode.value = v,
-                              ),
+                            return Column(
+                              children: [
+                                buildMenuItem(
+                                  dark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                                  t('theme'),
+                                  () => darkMode.value = !darkMode.value,
+                                  trailing: Switch(
+                                    value: dark,
+                                    activeColor: SchoolColors.accentGold,
+                                    onChanged: (v) => darkMode.value = v,
+                                  ),
+                                ),
+                                ValueListenableBuilder<AppDesign>(
+                                  valueListenable: selectedDesign,
+                                  builder: (context, design, _) {
+                                    return buildMenuItem(
+                                      Icons.design_services,
+                                      t('design'),
+                                      () => selectedDesign.value = design == AppDesign.def ? AppDesign.adv : AppDesign.def,
+                                      trailing: Text(
+                                        design == AppDesign.def ? "DEF" : "ADV",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: dark ? Colors.white : Colors.black87
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
                             );
                           },
                         ),
-                        ValueListenableBuilder<AppDesign>(
-                          valueListenable: selectedDesign,
-                          builder: (context, design, _) {
-                            return buildMenuItem(
-                              Icons.design_services_rounded,
-                              t('design'),
-                              () => selectedDesign.value = selectedDesign.value == AppDesign.def ? AppDesign.adv : AppDesign.def,
-                              trailing: Text(
-                                design == AppDesign.adv ? 'ADV' : 'DEF',
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: SchoolColors.primaryBlue),
+
+                        // Colors Menu
+                        Theme(
+                          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                          child: ExpansionTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: SchoolColors.primaryBlue.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
                               ),
+                              child: const Icon(Icons.color_lens, color: SchoolColors.primaryBlue, size: 20),
+                            ),
+                            title: Text(
+                              "Colors",
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600, 
+                                fontSize: 16, 
+                                color: darkMode.value ? Colors.white : Colors.black87
+                              ),
+                            ),
+                            childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+                            children: [
+                              ValueListenableBuilder2<ThemeOption, bool>(
+                                first: selectedThemeOption,
+                                second: gradientDirection,
+                                builder: (context, theme, direction, _) {
+                                  return Column(
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                        children: [
+                                          _buildThemeOptionRect(ThemeOption.yellowWhite, theme, direction, context),
+                                          _buildThemeOptionRect(ThemeOption.blueWhite, theme, direction, context),
+                                          _buildThemeOptionRect(ThemeOption.yellowBlue, theme, direction, context),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      InkWell(
+                                        onTap: () => gradientDirection.value = !gradientDirection.value,
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.rotate_right, color: SchoolColors.primaryBlue),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                "Rotate Gradient",
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  color: darkMode.value ? Colors.white : Colors.black87,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const Divider(height: 32, thickness: 1),
+
+                        ValueListenableBuilder<AppLanguage>(
+                          valueListenable: selectedLanguage,
+                          builder: (context, lang, _) {
+                            return buildMenuItem(Icons.language, t('language'), () {
+                              selectedLanguage.value = lang == AppLanguage.en ? AppLanguage.ro : AppLanguage.en;
+                            }, trailing: Text(
+                              lang == AppLanguage.en ? "EN" : "RO",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: darkMode.value ? Colors.white : Colors.black87
+                              ),
+                            ));
+                          },
+                        ),
+                        
+                        ValueListenableBuilder<bool>(
+                          valueListenable: isLoggedIn,
+                          builder: (context, loggedIn, _) {
+                            if (!loggedIn) return const SizedBox.shrink();
+                            return Column(
+                              children: [
+                                const Divider(height: 32, thickness: 1),
+                                buildMenuItem(Icons.logout_rounded, t('logout'), () {
+                                  isLoggedIn.value = false;
+                                  Navigator.pop(context);
+                                }, textColor: Colors.redAccent, iconColor: Colors.redAccent),
+                              ],
                             );
                           },
                         ),
-                        buildMenuItem(
-                          Icons.language_rounded,
-                          t('language'),
-                          () => selectedLanguage.value = selectedLanguage.value == AppLanguage.en ? AppLanguage.ro : AppLanguage.en,
-                          trailing: Text(
-                            lang == AppLanguage.ro ? 'RO' : 'EN',
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: SchoolColors.primaryBlue),
-                          ),
-                        ),
-                        if (isLoggedIn.value) ...[
-                          const Divider(height: 32),
-                          buildMenuItem(
-                            Icons.logout_rounded,
-                            t('logout'),
-                            () {
-                              Navigator.pop(context);
-                              isLoggedIn.value = false;
-                              Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-                            },
-                            textColor: Colors.redAccent,
-                            iconColor: Colors.redAccent,
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -797,6 +965,48 @@ class AppMenuDrawer extends StatelessWidget {
             },
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildThemeOptionRect(ThemeOption option, ThemeOption selected, bool direction, BuildContext context) {
+    final bool isSelected = option == selected;
+    // Use the actual gradient colors for the preview
+    final List<Color> colors = SchoolColors.getGradient(option, false, direction);
+
+    return GestureDetector(
+      onTap: () => selectedThemeOption.value = option,
+      child: Column(
+        children: [
+          Container(
+            width: 40,
+            height: 60,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: colors,
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.withOpacity(0.3)),
+              boxShadow: isSelected
+                  ? [BoxShadow(color: SchoolColors.accentGold.withOpacity(0.4), blurRadius: 8, spreadRadius: 1)]
+                  : [],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isSelected 
+                  ? SchoolColors.primaryBlue 
+                  : (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
+              border: Border.all(color: Colors.grey.withOpacity(0.3)),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -817,8 +1027,10 @@ class HelpPage extends StatelessWidget {
           appBar: design == AppDesign.adv
               ? null
               : AppBar(
-                  // Leading automatically becomes Hamburger if drawer is present
-                  title: Text(t('help')),
+                  title: null, // Title is now in body
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  iconTheme: const IconThemeData(color: Colors.white),
                 ),
           body: Stack(
             children: [
@@ -830,30 +1042,32 @@ class HelpPage extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          if (design != AppDesign.adv) const SizedBox(height: 40),
-                          if (design == AppDesign.adv)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 16.0),
-                              child: Text(
-                                t('help'),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                          // Top spacing for AppBar/Breadcrumb
+                          const SizedBox(height: kToolbarHeight + 16),
+                          
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Text(
+                              t('help'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          Icon(Icons.help_outline, size: 60, color: Colors.white.withOpacity(0.9)),
-                          const SizedBox(height: 16),
+                          ),
+                          Icon(Icons.help_outline, size: 50, color: Colors.white.withOpacity(0.9)),
+                          const SizedBox(height: 8),
                           Text(
                             t('how_to_use_app'),
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 24,
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
                             textAlign: TextAlign.center,
                           ),
+                          const SizedBox(height: 40), // Shift content up
                         ],
                       ),
                     ),
@@ -981,7 +1195,10 @@ class LoginPage extends StatelessWidget {
           appBar: design == AppDesign.adv
               ? null
               : AppBar(
-                  title: Text(t('login')),
+                  title: null,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  iconTheme: const IconThemeData(color: Colors.white),
                 ),
           body: Stack(
             children: [
@@ -993,32 +1210,32 @@ class LoginPage extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          if (design != AppDesign.adv) const SizedBox(height: 40),
-                          if (design == AppDesign.adv)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 16.0),
-                              child: Text(
-                                t('login'),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                          const SizedBox(height: kToolbarHeight + 16),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Text(
+                              t('login'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
+                          ),
                           Hero(
                             tag: 'app_icon',
-                            child: Icon(Icons.school, size: 80, color: SchoolColors.accentGold),
+                            child: Icon(Icons.school, size: 70, color: SchoolColors.accentGold),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 8),
                           Text(
                             t('enter_school_code'),
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 22,
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+                          const SizedBox(height: 40), // Shift content up
                         ],
                       ),
                     ),
@@ -1259,7 +1476,10 @@ class AboutPage extends StatelessWidget {
           appBar: design == AppDesign.adv
               ? null
               : AppBar(
-                  title: Text(t('about_us')),
+                  title: null,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  iconTheme: const IconThemeData(color: Colors.white),
                 ),
           body: Stack(
             children: [
@@ -1271,29 +1491,29 @@ class AboutPage extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          if (design != AppDesign.adv) const SizedBox(height: 40),
-                          if (design == AppDesign.adv)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 16.0),
-                              child: Text(
-                                t('about_us'),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                          const SizedBox(height: kToolbarHeight + 16),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Text(
+                              t('about_us'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          const Icon(Icons.info_outline, size: 60, color: Colors.white),
-                          const SizedBox(height: 16),
+                          ),
+                          const Icon(Icons.info_outline, size: 50, color: Colors.white),
+                          const SizedBox(height: 8),
                           Text(
                             t('meet_the_team'),
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 24,
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+                          const SizedBox(height: 40), // Shift content up
                         ],
                       ),
                     ),
@@ -1397,6 +1617,39 @@ class ValueListenableBuilder2<A, B> extends StatelessWidget {
           valueListenable: second,
           builder: (context, b, __) {
             return builder(context, a, b, child);
+          },
+        );
+      },
+    );
+  }
+}
+
+class ValueListenableBuilder3<A, B, C> extends StatelessWidget {
+  final ValueListenable<A> first;
+  final ValueListenable<B> second;
+  final ValueListenable<C> third;
+  final Widget Function(BuildContext context, A a, B b, C c, Widget? child) builder;
+  final Widget? child;
+
+  const ValueListenableBuilder3({
+    Key? key,
+    required this.first,
+    required this.second,
+    required this.third,
+    required this.builder,
+    this.child,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<A>(
+      valueListenable: first,
+      builder: (_, a, __) {
+        return ValueListenableBuilder2<B, C>(
+          first: second,
+          second: third,
+          builder: (context, b, c, __) {
+            return builder(context, a, b, c, child);
           },
         );
       },
