@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+
 import 'dart:ui'; // For ImageFilter
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'floating_background.dart';
-import 'package:http/http.dart' as http;
+
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Simple global auth state for demo purposes
 final ValueNotifier<bool> isLoggedIn = ValueNotifier<bool>(false);
@@ -102,7 +105,7 @@ String t(String key) {
       'design_settings_coming_soon': 'Design settings coming soon',
       'theme': 'Theme',
       'logout': 'Logout',
-      'login': 'Login',
+      'login': 'Enroll',
       'request_qr': 'Request QR',
       'temporary_notice': 'Temporary notice',
       'language': 'Language',
@@ -138,7 +141,7 @@ String t(String key) {
       'design_settings_coming_soon': 'Setările de design vor fi disponibile în curând',
       'theme': 'Temă',
       'logout': 'Deconectare',
-      'login': 'Autentificare',
+      'login': 'Enroll',
       'request_qr': 'Cere cod QR',
       'temporary_notice': 'Anunț temporar',
       'language': 'Limbă',
@@ -167,7 +170,12 @@ String t(String key) {
 }
 // ---
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+  if (prefs.containsKey('auth_token')) {
+    isLoggedIn.value = true;
+  }
   runApp(MyApp());
 }
 
@@ -1352,11 +1360,22 @@ class _SchoolCodeFieldWithButtonState extends State<_SchoolCodeFieldWithButton> 
 
       if (!mounted) return;
 
-      final responseData = jsonDecode(response.body);
-      final detail = responseData['detail'] as String? ?? '';
+      if (response.statusCode == 200) {
+        // Success - API returns a string token
+        // If it's a JSON string, decode it. If raw string, use as is.
+        String token = response.body;
+        try {
+           final decoded = jsonDecode(token);
+           if (decoded is String) token = decoded;
+        } catch (_) {
+           // Not JSON, use raw body
+        }
 
-      if (response.statusCode == 200 || detail == 'User already enrolled') {
-        // Success - user enrolled or already enrolled
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', token);
+
+        if (!mounted) return;
+
         isLoggedIn.value = true;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1375,8 +1394,24 @@ class _SchoolCodeFieldWithButtonState extends State<_SchoolCodeFieldWithButton> 
         if (Navigator.canPop(context)) {
           Navigator.pop(context);
         }
+      } else if (response.statusCode == 409) {
+        // User already enrolled
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.info_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                const Expanded(child: Text("User already enrolled")), // Hardcoded as per request or use translation if available
+              ],
+            ),
+            backgroundColor: Colors.orangeAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
       } else {
-        // Invalid credentials
+        // Invalid credentials or other error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -1583,13 +1618,157 @@ class AboutPage extends StatelessWidget {
 }
 
 // Placeholder for RequestQRPage
-class RequestQRPage extends StatelessWidget {
+class RequestQRPage extends StatefulWidget {
+  @override
+  State<RequestQRPage> createState() => _RequestQRPageState();
+}
+
+class _RequestQRPageState extends State<RequestQRPage> {
+  Uint8List? _qrImageBytes;
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  Future<void> _generateQR() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _qrImageBytes = null;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      if (token == null || token.isEmpty) {
+        _handleLogout();
+        return;
+      }
+
+      final response = await http.post(
+        Uri.parse('https://api.pontaj.binarysquad.club/mobile/qr_image'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _qrImageBytes = response.bodyBytes;
+        });
+      } else if (response.statusCode == 401) {
+        _handleLogout();
+      } else {
+        setState(() {
+          _errorMessage = 'Error: ${response.statusCode}';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to generate QR: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+        setState(() {
+          _errorMessage = 'Network Error';
+        });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t('network_error'))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    isLoggedIn.value = false;
+    if (mounted) {
+       Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+       ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Session expired. Please log in again.")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(t('request_qr')), backgroundColor: SchoolColors.primaryBlue),
-      body: Center(child: Text(t('temporary_notice'))),
-    );
+     return ValueListenableBuilder<AppDesign>(
+      valueListenable: selectedDesign,
+      builder: (context, design, _) {
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(t('request_qr')), 
+              backgroundColor: SchoolColors.primaryBlue,
+              iconTheme: const IconThemeData(color: Colors.white),
+              titleTextStyle: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            body: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (_qrImageBytes != null)
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: SchoolColors.primaryBlue, width: 2),
+                            borderRadius: BorderRadius.circular(16),
+                            color: Colors.white,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Expanded(child: Image.memory(_qrImageBytes!, fit: BoxFit.contain)),
+                              const SizedBox(height: 8),
+                              const Text("Scan this at the entrance", style: TextStyle(color: Colors.grey)),
+                            ],
+                          ),
+                        ),
+                      )
+                    else if (_errorMessage != null)
+                       Expanded(
+                         child: Center(
+                           child: Column(
+                             mainAxisSize: MainAxisSize.min,
+                             children: [
+                               const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                               const SizedBox(height: 16),
+                               Text(_errorMessage!, style: const TextStyle(color: Colors.redAccent)),
+                             ],
+                           ),
+                         ),
+                       )
+                    else
+                      const Expanded(
+                        child: Center(
+                          child: Icon(Icons.qr_code_scanner, size: 100, color: Colors.grey),
+                        ),
+                      ),
+                    
+                    const SizedBox(height: 32),
+                    
+                    if (_isLoading)
+                      const CircularProgressIndicator(color: SchoolColors.accentGold)
+                    else
+                      AnimatedActionButton(
+                        label: t('request_qr'), // Reusing the same string key "Request QR"
+                        onPressed: _generateQR,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          );
+      }
+     );
   }
 }
 
