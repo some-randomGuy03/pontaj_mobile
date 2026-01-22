@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:ui'; // For ImageFilter
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'floating_background.dart';
 
@@ -504,11 +505,15 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey,
-      extendBodyBehindAppBar: true,
-      drawer: const AppMenuDrawer(),
-      drawerEdgeDragWidth: MediaQuery.of(context).size.width,
+    return ValueListenableBuilder<bool>(
+      valueListenable: isLoggedIn,
+      builder: (context, loggedIn, _) {
+        return Scaffold(
+          key: _scaffoldKey,
+          extendBodyBehindAppBar: true,
+          drawer: loggedIn ? const AppMenuDrawer() : null,
+          drawerEnableOpenDragGesture: loggedIn,
+          drawerEdgeDragWidth: MediaQuery.of(context).size.width,
       body: Stack(
         children: [
           // Background
@@ -549,9 +554,15 @@ class _HomePageState extends State<HomePage> {
                         padding: const EdgeInsets.symmetric(horizontal: 8.0),
                         child: Row(
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.menu, color: Colors.white),
-                              onPressed: _toggleDrawer,
+                            ValueListenableBuilder<bool>(
+                              valueListenable: isLoggedIn,
+                              builder: (context, loggedIn, _) {
+                                if (!loggedIn) return const SizedBox(width: 48);
+                                return IconButton(
+                                  icon: const Icon(Icons.menu, color: Colors.white),
+                                  onPressed: _toggleDrawer,
+                                );
+                              },
                             ),
                             Expanded(
                               child: BreadcrumbBar(path: [t('app_title'), t('home')]),
@@ -565,9 +576,15 @@ class _HomePageState extends State<HomePage> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.menu, color: Colors.white),
-                              onPressed: _toggleDrawer,
+                            ValueListenableBuilder<bool>(
+                              valueListenable: isLoggedIn,
+                              builder: (context, loggedIn, _) {
+                                if (!loggedIn) return const SizedBox(width: 48); // Placeholder to keep spacing if needed
+                                return IconButton(
+                                  icon: const Icon(Icons.menu, color: Colors.white),
+                                  onPressed: _toggleDrawer,
+                                );
+                              },
                             ),
                             // Optional: Add School Logo here if available
                           ],
@@ -731,6 +748,8 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
+    );
+      },
     );
   }
 }
@@ -1366,7 +1385,16 @@ class _SchoolCodeFieldWithButtonState extends State<_SchoolCodeFieldWithButton> 
         String token = response.body;
         try {
            final decoded = jsonDecode(token);
-           if (decoded is String) token = decoded;
+           if (decoded is String) {
+             token = decoded;
+           } else if (decoded is Map<String, dynamic>) {
+             // Handle case where API returns {"token": "..."} or similar
+             if (decoded.containsKey('token')) {
+               token = decoded['token'].toString();
+             } else if (decoded.containsKey('access_token')) {
+               token = decoded['access_token'].toString();
+             }
+           }
         } catch (_) {
            // Not JSON, use raw body
         }
@@ -1624,9 +1652,17 @@ class RequestQRPage extends StatefulWidget {
 }
 
 class _RequestQRPageState extends State<RequestQRPage> {
-  Uint8List? _qrImageBytes;
   bool _isLoading = false;
   String? _errorMessage;
+  Timer? _timer;
+  int _remainingSeconds = 30;
+  Uint8List? _qrImageBytes;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _generateQR() async {
     setState(() {
@@ -1656,6 +1692,23 @@ class _RequestQRPageState extends State<RequestQRPage> {
       if (response.statusCode == 200) {
         setState(() {
           _qrImageBytes = response.bodyBytes;
+          _remainingSeconds = 30;
+        });
+        
+        // Start 30s countdown
+        _timer?.cancel(); // Cancel any existing
+        _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          if (!mounted) {
+            timer.cancel();
+            return;
+          }
+          setState(() {
+            _remainingSeconds--;
+          });
+          if (_remainingSeconds <= 0) {
+            timer.cancel();
+            Navigator.pop(context);
+          }
         });
       } else if (response.statusCode == 401) {
         _handleLogout();
@@ -1727,8 +1780,17 @@ class _RequestQRPageState extends State<RequestQRPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Expanded(child: Image.memory(_qrImageBytes!, fit: BoxFit.contain)),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 16),
                               const Text("Scan this at the entrance", style: TextStyle(color: Colors.grey)),
+                              const SizedBox(height: 8),
+                              Text(
+                                "Closing in $_remainingSeconds s",
+                                style: TextStyle(
+                                  color: _remainingSeconds <= 5 ? Colors.red : Colors.grey,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 24,
+                                ),
+                              ),
                             ],
                           ),
                         ),
