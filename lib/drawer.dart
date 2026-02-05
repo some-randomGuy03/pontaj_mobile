@@ -22,9 +22,10 @@ class AppMenuDrawer extends StatelessWidget {
               const tilePadding = EdgeInsets.symmetric(horizontal: 20.0, vertical: 8);
               
               Widget buildMenuItem(IconData icon, String title, VoidCallback onTap, {Widget? trailing, Color? textColor, Color? iconColor}) {
-                final effectiveIconColor = iconColor ?? SchoolColors.getMenuIconColor(selectedThemeOption.value, darkMode.value);
-                // Determine text color: explicit > dark mode white > default black
-                final effectiveTextColor = textColor ?? (darkMode.value ? Colors.white : Colors.black87);
+                final isDark = darkMode.value;
+                // Icons and text black in light mode, colorful/white in dark mode
+                final effectiveIconColor = iconColor ?? (isDark ? SchoolColors.getMenuIconColor(selectedThemeOption.value, true) : Colors.black);
+                final effectiveTextColor = textColor ?? (isDark ? Colors.white : Colors.black);
 
                 return ListTile(
                   contentPadding: tilePadding,
@@ -94,11 +95,15 @@ class AppMenuDrawer extends StatelessWidget {
                         return ListView(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           children: [
+                            // Home is always available
+                            buildMenuItem(Icons.home_rounded, t('home'), () {
+                              Navigator.pop(context);
+                              Navigator.pushNamed(context, "/");
+                            }),
+                            
+                            if (!loggedIn) const Divider(height: 32, thickness: 1),
+
                             if (loggedIn) ...[
-                              buildMenuItem(Icons.home_rounded, t('home'), () {
-                                Navigator.pop(context);
-                                Navigator.pushNamed(context, "/");
-                              }),
                               buildMenuItem(Icons.history, t('scans'), () {
                                 Navigator.pop(context);
                                 Navigator.pushNamed(context, "/scans");
@@ -107,10 +112,17 @@ class AppMenuDrawer extends StatelessWidget {
                                 Navigator.pop(context);
                                 Navigator.pushNamed(context, "/about");
                               }),
-                              buildMenuItem(Icons.help_outline_rounded, t('help'), () {
-                                Navigator.pop(context);
-                                Navigator.pushNamed(context, "/help");
-                              }),
+                            ],
+
+                            // Help is always available
+                            buildMenuItem(Icons.help_outline_rounded, t('help'), () {
+                              Navigator.pop(context);
+                              Navigator.pushNamed(context, "/help");
+                            }),
+
+                            if (!loggedIn) const Divider(height: 32, thickness: 1),
+
+                            if (loggedIn) ...[
                               const Divider(height: 32, thickness: 1),
                               
                               ValueListenableBuilder<bool>(
@@ -139,7 +151,7 @@ class AppMenuDrawer extends StatelessWidget {
                                               design == AppDesign.def ? "SIM" : "ADV",
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
-                                                color: dark ? Colors.white : Colors.black87
+                                                color: dark ? Colors.white : Colors.black
                                               ),
                                             ),
                                           );
@@ -154,7 +166,8 @@ class AppMenuDrawer extends StatelessWidget {
                               ValueListenableBuilder<ThemeOption>(
                                 valueListenable: selectedThemeOption,
                                 builder: (context, theme, _) {
-                                  final iconColor = SchoolColors.getMenuIconColor(theme, darkMode.value);
+                                  final isDark = darkMode.value;
+                                  final iconColor = isDark ? SchoolColors.getMenuIconColor(theme, true) : Colors.black;
                                   return Theme(
                                     data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                                     child: ExpansionTile(
@@ -171,7 +184,7 @@ class AppMenuDrawer extends StatelessWidget {
                                         style: TextStyle(
                                           fontWeight: FontWeight.w600, 
                                           fontSize: 16, 
-                                          color: darkMode.value ? Colors.white : Colors.black87
+                                          color: isDark ? Colors.white : Colors.black
                                         ),
                                       ),
                                       childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
@@ -209,7 +222,7 @@ class AppMenuDrawer extends StatelessWidget {
                                                           "Rotate Gradient",
                                                           style: TextStyle(
                                                             fontWeight: FontWeight.w600,
-                                                            color: darkMode.value ? Colors.white : Colors.black87,
+                                                            color: isDark ? Colors.white : Colors.black,
                                                           ),
                                                         ),
                                                       ],
@@ -238,12 +251,11 @@ class AppMenuDrawer extends StatelessWidget {
                                   lang == AppLanguage.en ? "EN" : "RO",
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: darkMode.value ? Colors.white : Colors.black87
+                                    color: darkMode.value ? Colors.white : Colors.black
                                   ),
                                 ));
                               },
                             ),
-                            
                             if (loggedIn) ...[
                               const Divider(height: 32, thickness: 1),
                               buildMenuItem(Icons.logout_rounded, t('logout'), () {

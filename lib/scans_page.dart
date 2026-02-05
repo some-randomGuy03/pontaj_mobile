@@ -199,84 +199,64 @@ class _ScansPageState extends State<ScansPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder3<AppDesign, bool, ThemeOption>(
-      first: selectedDesign,
-      second: darkMode,
-      third: selectedThemeOption,
-      builder: (context, design, isDark, themeOption, _) {
-       return Scaffold(
-         key: _scaffoldKey,
-         extendBodyBehindAppBar: true,
-           // Usually we use AppMenuDrawer from shared.dart? No, it's not in shared.dart yet. 
-           // Wait, I didn't verify if AppMenuDrawer was moved.
-           // Checked shared.dart content: AppMenuDrawer was NOT moved. It depends on `Navigator` and many things.
-           // I should rely on main.dart passing it or importing it? 
-           // AppMenuDrawer is in main.dart. I cannot import main.dart here.
-           // Solution: Create a placeholder or pass the drawer builder?
-           // OR: Redefine AppMenuDrawer in shared.dart? No, it is complex.
-           // OR: Be lazy and use a simple drawer here? The user wants consistency.
-           // BEST: Pass the drawer as a widget to the page? Navigation requires routes.
-           // 
-           // Let's look at shared.dart again. I only moved helpers.
-           // AppMenuDrawer is in main.dart.
-           // Code in main.dart uses ScansPage. ScansPage uses AppMenuDrawer. Circular dependency.
-           // To fix: Move AppMenuDrawer to shared.dart or `drawer.dart`.
-           // AppMenuDrawer depends on `Navigator` (ok), `t` (ok), `SchoolColors` (ok), `HomePage` (via route string).
-           // It uses route strings ("/"). So it doesn't import HomePage class.
-           // So I CAN move AppMenuDrawer to `drawer.dart` or `shared.dart`.
-           // I missed checking if AppMenuDrawer was in shared.dart. Logic says no, I only selected helpers.
-           
-           // I will simply NOT include the drawer in the Scaffold here if I can't easy access it, 
-           // OR I make ScansPage simple and assume the user pushes it.
-           // But ScansPage needs the drawer if it's a top level page.
-           
-           // I will create `lib/drawer.dart` and move AppMenuDrawer there.
-           // Then import it in both main.dart and scans_page.dart.
-           
-         drawer: const AppMenuDrawer(),
-         appBar: AppBar(
-            leading: IconButton(
-              icon: Icon(Icons.menu, color: isDark ? Colors.white : Colors.black),
-              onPressed: () {
-                if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
-                  _scaffoldKey.currentState?.closeDrawer();
-                } else {
-                  _scaffoldKey.currentState?.openDrawer();
-                } 
-              }, 
-            ),
-            title: Text(t('my_scans')),
-            centerTitle: true,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black),
-            titleTextStyle: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 20, fontWeight: FontWeight.bold),
-         ),
-         body: Stack(
-           children: [
-             SchoolGradientBackground(
-               child: SafeArea(
-                 child: Column(
-                   children: [
-                      // Filter Buttons
-                      _buildFilterButtons(),
-                      // Header / Countdown
-                      _buildHeader(context),
-                      Expanded(
-                        child: _isLoading 
-                          ? Center(child: CircularProgressIndicator(color: isDark ? Colors.white : Colors.black))
-                          : _errorMessage != null
-                            ? Center(child: Text(_errorMessage!, style: TextStyle(color: isDark ? Colors.white : Colors.black)))
-                            : _buildScansList(),
-                      ),
-                   ],
-                 ),
-               ),
+    return ValueListenableBuilder<AppLanguage>(
+      valueListenable: selectedLanguage,
+      builder: (context, lang, _) {
+        return ValueListenableBuilder3<AppDesign, bool, ThemeOption>(
+          first: selectedDesign,
+          second: darkMode,
+          third: selectedThemeOption,
+          builder: (context, design, isDark, themeOption, _) {
+           return Scaffold(
+             key: _scaffoldKey,
+             extendBodyBehindAppBar: true,
+             drawer: const AppMenuDrawer(),
+             appBar: AppBar(
+                leading: IconButton(
+                  icon: Icon(Icons.menu, color: isDark ? Colors.white : Colors.black),
+                  onPressed: () {
+                    if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+                      _scaffoldKey.currentState?.closeDrawer();
+                    } else {
+                      _scaffoldKey.currentState?.openDrawer();
+                    } 
+                  }, 
+                ),
+                title: Text(t('my_scans')),
+                centerTitle: true,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black),
+                titleTextStyle: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 20, fontWeight: FontWeight.bold),
              ),
-           ],
-         ),
-       );
-      });
+             body: Stack(
+               children: [
+                 SchoolGradientBackground(
+                   child: SafeArea(
+                     child: Column(
+                       children: [
+                          // Filter Buttons
+                          _buildFilterButtons(),
+                          // Header / Countdown
+                          _buildHeader(context),
+                          Expanded(
+                            child: _isLoading 
+                              ? Center(child: CircularProgressIndicator(color: isDark ? Colors.white : Colors.black))
+                              : _errorMessage != null
+                                ? Center(child: Text(_errorMessage!, style: TextStyle(color: isDark ? Colors.white : Colors.black)))
+                                : _buildScansList(),
+                          ),
+                       ],
+                     ),
+                   ),
+                 ),
+               ],
+             ),
+           );
+          }
+        );
+      }
+    );
   }
 
   Widget _buildHeader(BuildContext context) {
@@ -317,9 +297,29 @@ class _ScansPageState extends State<ScansPage> {
           if (canScan)
              Padding(
                padding: const EdgeInsets.only(top: 10.0),
-               child: Text(
-                 t('ready_for_qr'),
-                 style: TextStyle(color: darkMode.value ? Colors.white : Colors.black, fontSize: 16),
+               child: Column(
+                 children: [
+                   Text(
+                     t('ready_for_qr'),
+                     style: TextStyle(color: darkMode.value ? Colors.white : Colors.black, fontSize: 16),
+                   ),
+                   const SizedBox(height: 12),
+                   ElevatedButton.icon(
+                     onPressed: () {
+                       Navigator.pushNamed(context, '/request-qr');
+                     },
+                     icon: const Icon(Icons.qr_code_2),
+                     label: Text(t('request_qr')),
+                     style: ElevatedButton.styleFrom(
+                       backgroundColor: SchoolColors.getButtonColor(selectedThemeOption.value, darkMode.value),
+                       foregroundColor: SchoolColors.getButtonTextColor(selectedThemeOption.value, darkMode.value),
+                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                       shape: RoundedRectangleBorder(
+                         borderRadius: BorderRadius.circular(12),
+                       ),
+                     ),
+                   ),
+                 ],
                ),
              )
         ],
@@ -328,6 +328,14 @@ class _ScansPageState extends State<ScansPage> {
   }
 
   Widget _buildFilterButtons() {
+    // Map of internal filter values to translation keys
+    final filterMap = {
+      'All': 'filter_all',
+      'Month': 'filter_month',
+      'Week': 'filter_week',
+      'Today': 'filter_today',
+    };
+    
     final filters = ['All', 'Month', 'Week', 'Today'];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -339,7 +347,7 @@ class _ScansPageState extends State<ScansPage> {
           return Padding(
             padding: const EdgeInsets.only(right: 8.0),
             child: ChoiceChip(
-              label: Text(filter),
+              label: Text(t(filterMap[filter]!)),
               selected: isSelected,
               selectedColor: SchoolColors.getButtonColor(selectedThemeOption.value, darkMode.value),
               backgroundColor: Colors.white.withOpacity(0.1),

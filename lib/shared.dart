@@ -161,7 +161,11 @@ String t(String key) {
       'my_scans': 'My Scans',
       'next_scan_in': 'Next scan available in:',
       'scan_ready': 'Scan Ready',
-      'scanned_at': 'Scanned at'
+      'scanned_at': 'Scanned at',
+      'filter_all': 'All',
+      'filter_month': 'Month',
+      'filter_week': 'Week',
+      'filter_today': 'Today'
     },
     'ro': {
       'home': 'Acasă',
@@ -202,7 +206,11 @@ String t(String key) {
       'my_scans': 'Scanările mele',
       'next_scan_in': 'Următoarea scanare în:',
       'scan_ready': 'Poți scana acum',
-      'scanned_at': 'Scanat la'
+      'scanned_at': 'Scanat la',
+      'filter_all': 'Toate',
+      'filter_month': 'Luna',
+      'filter_week': 'Săptămâna',
+      'filter_today': 'Astăzi'
     }
   };
   final code = selectedLanguage.value == AppLanguage.en ? 'en' : 'ro';

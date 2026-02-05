@@ -524,9 +524,10 @@ class HelpPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<AppDesign>(
-      valueListenable: selectedDesign,
-      builder: (context, design, _) {
+    return ValueListenableBuilder2<AppDesign, bool>(
+      first: selectedDesign,
+      second: darkMode,
+      builder: (context, design, isDark, _) {
         return Scaffold(
           key: _scaffoldKey,
           extendBodyBehindAppBar: true,
@@ -537,7 +538,7 @@ class HelpPage extends StatelessWidget {
                   title: null, // Title is now in body
                   backgroundColor: Colors.transparent,
                   elevation: 0,
-                  iconTheme: const IconThemeData(color: Colors.white),
+                  iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black),
                 ),
           body: Stack(
             children: [
@@ -552,34 +553,29 @@ class HelpPage extends StatelessWidget {
                   // Top spacing for AppBar/Breadcrumb
                           const SizedBox(height: kToolbarHeight + 16),
                           
-                          ValueListenableBuilder<bool>(
-                            valueListenable: darkMode,
-                            builder: (context, isDark, _) {
-                              return Column(
-                                children: [
-                                  Text(
-                                    t('help'),
-                                    style: TextStyle(
-                                      color: isDark ? Colors.white : Colors.black,
-                                      fontSize: 32,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                          Column(
+                            children: [
+                              Text(
+                                t('help'),
+                                style: TextStyle(
+                                  color: isDark ? Colors.white : Colors.black,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 110.0),
+                                child: Text(
+                                  t('how_to_use_app'),
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white : Colors.black,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                  const SizedBox(height: 8),
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 110.0),
-                                    child: Text(
-                                      t('how_to_use_app'),
-                                      style: TextStyle(
-                                        color: isDark ? Colors.white : Colors.black,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 40), // Shift content up
                         ],
@@ -624,25 +620,15 @@ class HelpPage extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
                       child: Row(
                         children: [
-                          ValueListenableBuilder<bool>(
-                            valueListenable: darkMode,
-                            builder: (context, isDark, _) {
-                              return IconButton(
-                                icon: Icon(Icons.menu, color: isDark ? Colors.white : Colors.black),
-                                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                              );
-                            }
+                          IconButton(
+                            icon: Icon(Icons.menu, color: isDark ? Colors.white : Colors.black),
+                            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                           ),
                           Expanded(child: BreadcrumbBar(path: [t('app_title'), t('help')])),
-                          ValueListenableBuilder<bool>(
-                            valueListenable: darkMode,
-                            builder: (context, isDark, _) {
-                              return Icon(
-                                Icons.help_outline,
-                                size: 20,
-                                color: isDark ? Colors.white : Colors.black,
-                              );
-                            }
+                          Icon(
+                            Icons.help_outline,
+                            size: 20,
+                            color: isDark ? Colors.white : Colors.black,
                           ),
                           const SizedBox(width: 8),
                         ],
@@ -1045,9 +1031,10 @@ class AboutPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<AppDesign>(
-      valueListenable: selectedDesign,
-      builder: (context, design, _) {
+    return ValueListenableBuilder2<AppDesign, bool>(
+      first: selectedDesign,
+      second: darkMode,
+      builder: (context, design, isDark, _) {
         return Scaffold(
           key: _scaffoldKey,
           extendBodyBehindAppBar: true,
@@ -1058,7 +1045,7 @@ class AboutPage extends StatelessWidget {
                   title: null,
                   backgroundColor: Colors.transparent,
                   elevation: 0,
-                  iconTheme: const IconThemeData(color: Colors.white),
+                  iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black),
                 ),
           body: Stack(
             children: [
@@ -1071,34 +1058,29 @@ class AboutPage extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const SizedBox(height: kToolbarHeight + 16),
-                          ValueListenableBuilder<bool>(
-                            valueListenable: darkMode,
-                            builder: (context, isDark, _) {
-                              return Column(
-                                children: [
-                                  Text(
-                                    t('about_us'),
-                                    style: TextStyle(
-                                      color: isDark ? Colors.white : Colors.black,
-                                      fontSize: 32,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                          Column(
+                            children: [
+                              Text(
+                                t('about_us'),
+                                style: TextStyle(
+                                  color: isDark ? Colors.white : Colors.black,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 95.0),
+                                child: Text(
+                                  t('meet_the_team'),
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white : Colors.black,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                  const SizedBox(height: 8),
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 95.0),
-                                    child: Text(
-                                      t('meet_the_team'),
-                                      style: TextStyle(
-                                        color: isDark ? Colors.white : Colors.black,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 40), // Shift content up
                         ],
@@ -1151,25 +1133,15 @@ class AboutPage extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
                       child: Row(
                         children: [
-                          ValueListenableBuilder<bool>(
-                            valueListenable: darkMode,
-                            builder: (context, isDark, _) {
-                              return IconButton(
-                                icon: Icon(Icons.menu, color: isDark ? Colors.white : Colors.black),
-                                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                              );
-                            }
+                          IconButton(
+                            icon: Icon(Icons.menu, color: isDark ? Colors.white : Colors.black),
+                            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                           ),
                           Expanded(child: BreadcrumbBar(path: [t('app_title'), t('about')])),
-                          ValueListenableBuilder<bool>(
-                            valueListenable: darkMode,
-                            builder: (context, isDark, _) {
-                              return Icon(
-                                Icons.info_outline,
-                                size: 20,
-                                color: isDark ? Colors.white : Colors.black,
-                              );
-                            }
+                          Icon(
+                            Icons.info_outline,
+                            size: 20,
+                            color: isDark ? Colors.white : Colors.black,
                           ),
                           const SizedBox(width: 8),
                         ],
@@ -1257,10 +1229,8 @@ class _RequestQRPageState extends State<RequestQRPage> {
           });
           if (_remainingSeconds <= 0) {
             timer.cancel();
-            setState(() {
-              _qrImageBytes = null; // Hide QR
-              _errorMessage = "QR Code Expired. Please request a new one.";
-            });
+            // Automatically renew the QR code
+            _generateQR();
           }
         });
       } else if (response.statusCode == 401) {
@@ -1382,13 +1352,7 @@ class _RequestQRPageState extends State<RequestQRPage> {
                     const SizedBox(height: 32),
                     
                     if (_isLoading)
-                      const CircularProgressIndicator(color: SchoolColors.accentGold)
-                    else
-                      AnimatedActionButton(
-                        // If QR is visible/expired, show "Request New QR", otherwise "Request QR"
-                        label: (_qrImageBytes != null || _errorMessage != null) ? "Request New QR" : t('request_qr'),
-                        onPressed: _generateQR,
-                      ),
+                      const CircularProgressIndicator(color: SchoolColors.accentGold),
                   ],
                 ),
               ),
