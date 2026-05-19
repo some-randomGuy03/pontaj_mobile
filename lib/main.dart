@@ -606,6 +606,43 @@ class HelpPage extends StatelessWidget {
                       _buildHelpStep(context, '1', t('step_1'), t('enter_school_code')),
                       _buildHelpStep(context, '2', t('step_2'), t('tap_start_to_sign_in')),
                       _buildHelpStep(context, '3', t('step_3'), t('use_app_to_manage_attendance')),
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 16),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.info_outline_rounded,
+                            color: isDark ? SchoolColors.accentGold : SchoolColors.primaryBlue,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  t('help_note_title'),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  t('help_note_desc'),
+                                  style: TextStyle(
+                                    color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.7),
+                                    fontSize: 14,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -1186,6 +1223,65 @@ class _RequestQRPageState extends State<RequestQRPage> {
     super.dispose();
   }
 
+  Future<Duration> _checkCooldown() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      if (token == null || token.isEmpty) return Duration.zero;
+
+      final now = DateTime.now();
+      final start = now.subtract(const Duration(days: 1)).toUtc().toIso8601String();
+      final end = now.add(const Duration(days: 1)).toUtc().toIso8601String();
+
+      final uri = Uri.parse('https://api.pontaj.binarysquad.club/mobile/enrolled_student_scans')
+          .replace(queryParameters: {
+        'start': start,
+        'end': end,
+      });
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        var data = jsonDecode(response.body);
+        if (data is Map<String, dynamic>) {
+          if (data.containsKey('data') && data['data'] is List) {
+            data = data['data'];
+          } else if (data.containsKey('scans') && data['scans'] is List) {
+            data = data['scans'];
+          }
+        }
+
+        if (data is List && data.isNotEmpty) {
+          DateTime? latestScan;
+          for (var item in data) {
+            final parsed = parseScanDate(item);
+            if (parsed != null) {
+              if (latestScan == null || parsed.isAfter(latestScan)) {
+                latestScan = parsed;
+              }
+            }
+          }
+
+          if (latestScan != null) {
+            final latestScanLocal = latestScan.toLocal();
+            final nextAllowed = latestScanLocal.add(const Duration(hours: 1));
+            final diff = nextAllowed.difference(DateTime.now());
+            return diff.isNegative ? Duration.zero : diff;
+          }
+        }
+      }
+    } catch (_) {
+      // Ignore and fail open
+    }
+    return Duration.zero;
+  }
+
   Future<void> _generateQR() async {
     setState(() {
       _isLoading = true;
@@ -1199,6 +1295,15 @@ class _RequestQRPageState extends State<RequestQRPage> {
 
       if (token == null || token.isEmpty) {
         _handleLogout();
+        return;
+      }
+
+      final cooldown = await _checkCooldown();
+      if (cooldown.inSeconds > 0) {
+        setState(() {
+          _errorMessage = t('qr_cooldown_error');
+          _isLoading = false;
+        });
         return;
       }
 

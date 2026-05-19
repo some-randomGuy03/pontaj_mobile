@@ -145,9 +145,9 @@ String t(String key) {
       'step_1': 'Step 1',
       'step_2': 'Step 2',
       'step_3': 'Step 3',
-      'enter_school_code': 'Enter your school code',
-      'tap_start_to_sign_in': 'Tap start to sign in',
-      'use_app_to_manage_attendance': 'Use the app to manage attendance',
+      'enter_school_code': 'Log in with your school code',
+      'tap_start_to_sign_in': 'Use the button in the menu to create a QR code',
+      'use_app_to_manage_attendance': 'Scan the QR code at the exit camera to exit',
       'invalid_credentials': 'Invalid credentials. Please check your code.',
       'enrollment_success': 'Enrollment successful!',
       'network_error': 'Network error. Please try again.',
@@ -165,7 +165,10 @@ String t(String key) {
       'filter_all': 'All',
       'filter_month': 'Month',
       'filter_week': 'Week',
-      'filter_today': 'Today'
+      'filter_today': 'Today',
+      'help_note_title': 'Note:',
+      'help_note_desc': 'Once logged in, you never have to log out. Remember to check the cooldown for requesting QR codes.',
+      'qr_cooldown_error': 'Check your QR cooldown'
     },
     'ro': {
       'home': 'Acasă',
@@ -190,9 +193,9 @@ String t(String key) {
       'step_1': 'Pasul 1',
       'step_2': 'Pasul 2',
       'step_3': 'Pasul 3',
-      'enter_school_code': 'Introdu codul școlii',
-      'tap_start_to_sign_in': 'Apasă start pentru a te autentifica',
-      'use_app_to_manage_attendance': 'Folosește aplicația pentru a gestiona prezența',
+      'enter_school_code': 'Autentifică-te cu codul școlii',
+      'tap_start_to_sign_in': 'Folosește butonul din meniu pentru a genera un cod QR',
+      'use_app_to_manage_attendance': 'Scanează codul QR la camera de la ieșire pentru a ieși',
       'invalid_credentials': 'Credențiale invalide. Verifică codul.',
       'enrollment_success': 'Înrolare reușită!',
       'network_error': 'Eroare de rețea. Încearcă din nou.',
@@ -210,11 +213,42 @@ String t(String key) {
       'filter_all': 'Toate',
       'filter_month': 'Luna',
       'filter_week': 'Săptămâna',
-      'filter_today': 'Astăzi'
+      'filter_today': 'Astăzi',
+      'help_note_title': 'Notă:',
+      'help_note_desc': 'Odată autentificat, nu trebuie să te deconectezi niciodată. Amintește-ți să verifici timpul de așteptare pentru generarea de noi coduri QR.',
+      'qr_cooldown_error': 'Verifică timpul de așteptare pentru QR'
     }
   };
   final code = selectedLanguage.value == AppLanguage.en ? 'en' : 'ro';
   return translations[code]![key] ?? key;
+}
+
+DateTime? parseScanDate(dynamic scanItem) {
+  if (scanItem is String) {
+    final parsed = DateTime.tryParse(scanItem);
+    if (parsed != null) {
+      if (!scanItem.endsWith('Z') && !scanItem.contains('+')) {
+        return DateTime.utc(parsed.year, parsed.month, parsed.day, 
+                           parsed.hour, parsed.minute, parsed.second);
+      }
+      return parsed;
+    }
+  } else if (scanItem is Map) {
+    for (var key in ['created_at', 'timestamp', 'time', 'date', 'scan_time']) {
+      if (scanItem[key] != null) {
+        final dateStr = scanItem[key].toString();
+        final parsed = DateTime.tryParse(dateStr);
+        if (parsed != null) {
+          if (!dateStr.endsWith('Z') && !dateStr.contains('+')) {
+            return DateTime.utc(parsed.year, parsed.month, parsed.day, 
+                               parsed.hour, parsed.minute, parsed.second);
+          }
+          return parsed;
+        }
+      }
+    }
+  }
+  return null;
 }
 
 

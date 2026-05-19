@@ -59,22 +59,22 @@ class _ScansPageState extends State<ScansPage> {
 
       final now = DateTime.now();
       String start;
-      String end = now.add(const Duration(days: 1)).toIso8601String();
+      String end = now.add(const Duration(days: 1)).toUtc().toIso8601String();
 
       switch (_selectedRange) {
         case 'Today':
           final startOfDay = DateTime(now.year, now.month, now.day);
-          start = startOfDay.toIso8601String();
+          start = startOfDay.toUtc().toIso8601String();
           break;
         case 'Week':
-          start = now.subtract(const Duration(days: 7)).toIso8601String();
+          start = now.subtract(const Duration(days: 7)).toUtc().toIso8601String();
           break;
         case 'Month':
-          start = now.subtract(const Duration(days: 30)).toIso8601String();
+          start = now.subtract(const Duration(days: 30)).toUtc().toIso8601String();
           break;
         case 'All':
         default:
-          start = DateTime(2020).toIso8601String();
+          start = DateTime(2020).toUtc().toIso8601String();
           break;
       }
 
